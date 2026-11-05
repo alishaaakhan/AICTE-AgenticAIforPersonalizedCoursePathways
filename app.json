@@ -1,0 +1,78 @@
+{
+  "name": "LearnMate",
+  "description": "Agentic AI for Personalized Course Pathways – powered by IBM Granite on IBM watsonx.ai (AICTE Problem Statement #12)",
+  "keywords": [
+    "agentic-ai",
+    "ibm-granite",
+    "watsonx",
+    "education",
+    "course-recommendation",
+    "personalized-learning",
+    "flask",
+    "python"
+  ],
+  "website": "https://github.com/alishaaakhan/AICTE---Agentic-AI-for-Personalized-Course-Pathways",
+  "repository": "https://github.com/alishaaakhan/AICTE---Agentic-AI-for-Personalized-Course-Pathways",
+  "logo": "https://www.ibm.com/favicon.ico",
+  "success_url": "/",
+  "scripts": {
+    "postdeploy": "echo LearnMate deployed successfully"
+  },
+  "env": {
+    "IBM_API_KEY": {
+      "description": "IBM Cloud IAM API key. Get one at https://cloud.ibm.com/iam/apikeys",
+      "required": true
+    },
+    "WATSONX_PROJECT_ID": {
+      "description": "IBM watsonx.ai project ID. Find it in your project → Manage → General at https://dataplatform.cloud.ibm.com",
+      "required": true
+    },
+    "WATSONX_URL": {
+      "description": "IBM watsonx.ai regional endpoint URL.",
+      "value": "https://us-south.ml.cloud.ibm.com",
+      "required": true
+    },
+    "GRANITE_MODEL_ID": {
+      "description": "IBM Granite model ID available in your watsonx.ai environment.",
+      "value": "ibm/granite-4-h-small",
+      "required": true
+    },
+    "DATA_DIR": {
+      "description": "Directory path where student profile JSON files are stored.",
+      "value": "./data",
+      "required": false
+    },
+    "MAX_NEW_TOKENS": {
+      "description": "Maximum number of tokens the model generates per response.",
+      "value": "1024",
+      "required": false
+    },
+    "TEMPERATURE": {
+      "description": "Sampling temperature for model responses (0.0 = deterministic, 1.0 = creative).",
+      "value": "0.7",
+      "required": false
+    },
+    "TOP_P": {
+      "description": "Nucleus sampling probability threshold.",
+      "value": "0.9",
+      "required": false
+    },
+    "FLASK_SECRET": {
+      "description": "Secret key used by Flask for session signing. Use a long random string in production.",
+      "generator": "secret",
+      "required": false
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "stack": "heroku-24"
+}
