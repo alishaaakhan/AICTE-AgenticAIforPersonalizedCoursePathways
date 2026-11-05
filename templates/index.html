@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LearnMate – AI Course Pathways</title>
+  <link rel="stylesheet" href="/static/css/styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+
+<!-- ════════════════════════════════════════════════════════
+     ONBOARDING MODAL
+════════════════════════════════════════════════════════ -->
+<div id="onboarding-overlay" class="overlay active">
+  <div class="modal">
+    <div class="modal-logo">
+      <span class="logo-icon">🎓</span>
+      <h1>LearnMate</h1>
+      <p class="modal-sub">Agentic AI for Personalized Course Pathways<br>
+        <span class="ibm-badge">Powered by IBM Granite · IBM watsonx.ai</span>
+      </p>
+    </div>
+
+    <!-- Step 1: Name -->
+    <div class="step active" id="step-1">
+      <h2>What's your name?</h2>
+      <input id="ob-name" type="text" placeholder="e.g. Alisha Sharma" autocomplete="off" />
+      <p class="hint">Returning students will be recognized automatically.</p>
+      <button class="btn-primary" onclick="App.onboardNext(1)">Continue →</button>
+    </div>
+
+    <!-- Step 2: Domain -->
+    <div class="step" id="step-2">
+      <h2>What do you want to learn?</h2>
+      <div class="domain-grid" id="domain-grid"><!-- filled by JS --></div>
+      <button class="btn-secondary" onclick="App.onboardBack(2)">← Back</button>
+      <button class="btn-primary" onclick="App.onboardNext(2)">Continue →</button>
+    </div>
+
+    <!-- Step 3: Skill level -->
+    <div class="step" id="step-3">
+      <h2>What's your current skill level?</h2>
+      <div class="level-cards" id="level-cards">
+        <div class="level-card active" data-level="beginner">
+          <span class="level-icon">🌱</span>
+          <strong>Beginner</strong>
+          <small>Just starting out</small>
+        </div>
+        <div class="level-card" data-level="intermediate">
+          <span class="level-icon">🚀</span>
+          <strong>Intermediate</strong>
+          <small>Know the basics</small>
+        </div>
+        <div class="level-card" data-level="advanced">
+          <span class="level-icon">⚡</span>
+          <strong>Advanced</strong>
+          <small>Ready for deep dives</small>
+        </div>
+      </div>
+      <button class="btn-secondary" onclick="App.onboardBack(3)">← Back</button>
+      <button class="btn-primary" onclick="App.onboardNext(3)">Continue →</button>
+    </div>
+
+    <!-- Step 4: Goal & hours -->
+    <div class="step" id="step-4">
+      <h2>Tell me about your goals</h2>
+      <label>Long-term goal</label>
+      <input id="ob-goal" type="text" placeholder="e.g. Get a frontend developer job" />
+      <label>Hours per week you can study</label>
+      <div class="hours-row">
+        <input id="ob-hours" type="range" min="1" max="40" value="5" oninput="document.getElementById('hours-val').textContent=this.value" />
+        <span id="hours-val">5</span> hrs/week
+      </div>
+      <label>Preferred learning style</label>
+      <select id="ob-style">
+        <option value="video">📹 Video</option>
+        <option value="text">📖 Text / Articles</option>
+        <option value="project-based">🛠 Project-based</option>
+        <option value="mixed" selected>🎨 Mixed</option>
+      </select>
+      <button class="btn-secondary" onclick="App.onboardBack(4)">← Back</button>
+      <button class="btn-primary" onclick="App.onboardSubmit()">Build My Roadmap 🗺</button>
+    </div>
+
+    <!-- Loading state -->
+    <div class="step" id="step-loading">
+      <div class="loading-anim">
+        <div class="spinner"></div>
+        <p id="loading-msg">Building your personalized roadmap with IBM Granite…</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ════════════════════════════════════════════════════════
+     MAIN APP SHELL
+════════════════════════════════════════════════════════ -->
+<div id="app" class="hidden">
+
+  <!-- ── Sidebar ─────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <span>🎓</span> LearnMate
+    </div>
+
+    <div class="student-card" id="sidebar-student">
+      <div class="avatar" id="sidebar-avatar">?</div>
+      <div>
+        <div class="student-name" id="sidebar-name">—</div>
+        <div class="student-domain" id="sidebar-domain">—</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <a class="nav-item active" data-tab="chat" onclick="App.switchTab('chat')">
+        <span class="nav-icon">💬</span> Chat Coach
+      </a>
+      <a class="nav-item" data-tab="roadmap" onclick="App.switchTab('roadmap')">
+        <span class="nav-icon">🗺</span> My Roadmap
+      </a>
+      <a class="nav-item" data-tab="progress" onclick="App.switchTab('progress')">
+        <span class="nav-icon">📈</span> Progress
+      </a>
+      <a class="nav-item" data-tab="assess" onclick="App.switchTab('assess')">
+        <span class="nav-icon">🧠</span> Skill Quiz
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="ibm-badge-sm">IBM Granite · watsonx.ai</div>
+      <button class="btn-ghost" onclick="App.newSession()">Switch Student</button>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ─────────────────────────────────── -->
+  <main class="main-content">
+
+    <!-- ── CHAT TAB ─────────────────────────────────── -->
+    <section id="tab-chat" class="tab active">
+      <div class="tab-header">
+        <h2>💬 Chat with LearnMate</h2>
+        <span id="llm-badge" class="badge badge-green hidden">IBM Granite Active</span>
+        <span id="llm-badge-off" class="badge badge-yellow hidden">Rule-based Mode</span>
+      </div>
+
+      <div class="chat-window" id="chat-window">
+        <!-- Messages injected by JS -->
+      </div>
+
+      <div class="chat-input-row">
+        <input
+          id="chat-input"
+          type="text"
+          placeholder="Ask anything… 'show roadmap', 'how do I learn React?', …"
+          onkeydown="if(event.key==='Enter') App.sendChat()"
+        />
+        <button class="btn-primary" onclick="App.sendChat()">Send</button>
+      </div>
+
+      <!-- Quick action chips -->
+      <div class="chip-row">
+        <button class="chip" onclick="App.quickChat('Show my roadmap')">🗺 My Roadmap</button>
+        <button class="chip" onclick="App.quickChat('What should I learn next?')">📚 What next?</button>
+        <button class="chip" onclick="App.quickChat('How am I doing?')">📈 My Progress</button>
+        <button class="chip" onclick="App.quickChat('Give me a motivational tip')">✨ Motivate me</button>
+      </div>
+    </section>
+
+    <!-- ── ROADMAP TAB ─────────────────────────────── -->
+    <section id="tab-roadmap" class="tab hidden">
+      <div class="tab-header">
+        <h2>🗺 My Learning Roadmap</h2>
+        <button class="btn-outline" onclick="App.regenerateRoadmap()">🔄 Regenerate</button>
+      </div>
+      <div id="roadmap-container">
+        <div class="empty-state">Loading your roadmap…</div>
+      </div>
+    </section>
+
+    <!-- ── PROGRESS TAB ──────────────────────────────── -->
+    <section id="tab-progress" class="tab hidden">
+      <div class="tab-header">
+        <h2>📈 My Progress</h2>
+        <button class="btn-outline" onclick="App.loadProgress()">↺ Refresh</button>
+      </div>
+
+      <!-- Stats row -->
+      <div class="stats-row" id="stats-row">
+        <div class="stat-card"><div class="stat-val" id="stat-pct">–</div><div class="stat-label">Complete</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-done">–</div><div class="stat-label">Courses Done</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-inprog">–</div><div class="stat-label">In Progress</div></div>
+        <div class="stat-card"><div class="stat-val" id="stat-eta">–</div><div class="stat-label">Est. Completion</div></div>
+      </div>
+
+      <!-- Next course -->
+      <div class="next-course-card hidden" id="next-course-card">
+        <div class="next-label">▶ Up Next</div>
+        <div class="next-title" id="next-title"></div>
+        <a class="btn-primary btn-sm" id="next-url" href="#" target="_blank">Open Resource →</a>
+      </div>
+
+      <!-- Completed list -->
+      <div id="completed-list"></div>
+
+      <!-- In-progress list -->
+      <div id="inprogress-list"></div>
+    </section>
+
+    <!-- ── ASSESS TAB ─────────────────────────────────── -->
+    <section id="tab-assess" class="tab hidden">
+      <div class="tab-header">
+        <h2>🧠 Skill Assessment Quiz</h2>
+      </div>
+
+      <div class="assess-box" id="assess-box">
+        <p class="assess-intro">
+          Test your knowledge with AI-generated questions.<br>
+          LearnMate will evaluate your answers and update your skill level.
+        </p>
+        <button class="btn-primary" onclick="App.startAssess()">Start Quiz →</button>
+      </div>
+
+      <div class="assess-qa hidden" id="assess-qa">
+        <div class="assess-question" id="assess-question"></div>
+        <textarea id="assess-answer" placeholder="Type your answer here…" rows="5"></textarea>
+        <button class="btn-primary" onclick="App.submitAssess()">Submit Answer</button>
+      </div>
+
+      <div class="assess-feedback hidden" id="assess-feedback">
+        <div class="feedback-score" id="feedback-score"></div>
+        <div class="feedback-text" id="feedback-text"></div>
+        <button class="btn-outline" onclick="App.nextQuestion()">Next Question →</button>
+        <button class="btn-ghost" onclick="App.endQuiz()">Finish Quiz</button>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>

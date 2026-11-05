@@ -1,0 +1,9 @@
+ibm-watsonx-ai>=1.1.2
+ibm-cloud-sdk-core>=3.19.2
+python-dotenv>=1.0.0
+requests>=2.31.0
+rich>=13.7.0
+questionary>=2.0.1
+pydantic>=2.5.0
+json5>=0.9.14
+flask>=3.0.0
