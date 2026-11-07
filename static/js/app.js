@@ -14,13 +14,29 @@ const App = (() => {
     domain:       null,
     skillLevel:   'beginner',
     llmAvailable: false,
-    // onboarding temp selections
     ob: { name: '', domain: '', level: 'beginner', goal: '', hours: 5, style: 'mixed' },
-    // assessment
     currentQuestion: '',
     questionCount: 0,
     totalScore: 0,
+    roadmapData: [],         // cached for PDF
+    _chartDonut: null,       // Chart.js instances
+    _chartBar:   null,
   };
+
+  /* ── Theme ──────────────────────────────────────────── */
+  function setTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('lm-theme', theme);
+    // update active button
+    document.querySelectorAll('.theme-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.theme === theme);
+    });
+  }
+  // Restore saved theme on load
+  (function() {
+    const saved = localStorage.getItem('lm-theme');
+    if (saved) setTheme(saved);
+  })();
 
   /* ── Init ──────────────────────────────────────────── */
   function init() {
@@ -131,6 +147,13 @@ const App = (() => {
     document.getElementById('sidebar-name').textContent   = p.name;
     document.getElementById('sidebar-domain').textContent = p.primary_domain;
     document.getElementById('sidebar-avatar').textContent = p.name[0].toUpperCase();
+
+    // Populate topbar
+    const initials = p.name[0].toUpperCase();
+    const tbAvatar = document.getElementById('topbar-avatar');
+    const tbName   = document.getElementById('topbar-username');
+    if (tbAvatar) tbAvatar.textContent = initials;
+    if (tbName)   tbName.textContent   = p.name;
 
     // IBM badge
     if (state.llmAvailable) {
@@ -250,7 +273,11 @@ const App = (() => {
     win.insertAdjacentHTML('beforeend', `
       <div class="msg bot msg-typing" id="typing-indicator">
         <div class="msg-avatar">🤖</div>
-        <div class="msg-bubble"></div>
+        <div class="msg-bubble">
+          <span class="dot"></span>
+          <span class="dot"></span>
+          <span class="dot"></span>
+        </div>
       </div>`);
     win.scrollTop = win.scrollHeight;
     return document.getElementById('typing-indicator');
@@ -270,7 +297,15 @@ const App = (() => {
     }
   }
 
+  /* ── PDF Export ─────────────────────────────────────── */
+  function exportRoadmapPDF() {
+    // Switch to roadmap tab so print captures it
+    switchTab('roadmap');
+    setTimeout(() => window.print(), 400);
+  }
+
   function renderRoadmap(roadmap) {
+    state.roadmapData = roadmap;   // cache for PDF
     const container = document.getElementById('roadmap-container');
     if (!roadmap.length) {
       container.innerHTML = '<div class="empty-state">No roadmap yet. Try regenerating!</div>';
@@ -425,6 +460,88 @@ const App = (() => {
     document.getElementById('stat-inprog').textContent = r.in_progress_courses ?? '–';
     document.getElementById('stat-eta').textContent    = r.estimated_completion ?? '–';
 
+    // ── Charts ───────────────────────────────────────────
+    const done    = r.completed_courses  || 0;
+    const inprog  = r.in_progress_courses || 0;
+    const total   = r.total_courses || (done + inprog + 1);
+    const notStart = Math.max(0, total - done - inprog);
+
+    // Donut chart
+    const donutCtx = document.getElementById('chart-donut');
+    if (donutCtx) {
+      if (state._chartDonut) state._chartDonut.destroy();
+      state._chartDonut = new Chart(donutCtx, {
+        type: 'doughnut',
+        data: {
+          labels: ['Completed', 'In Progress', 'Not Started'],
+          datasets: [{
+            data: [done, inprog, notStart],
+            backgroundColor: ['rgba(16,185,129,0.85)', 'rgba(245,158,11,0.85)', 'rgba(255,255,255,0.12)'],
+            borderColor:     ['#10b981', '#f59e0b', 'rgba(255,255,255,0.2)'],
+            borderWidth: 2,
+            hoverOffset: 6,
+          }],
+        },
+        options: {
+          cutout: '72%',
+          plugins: {
+            legend: { labels: { color: 'rgba(255,255,255,0.7)', font: { size: 12 }, boxWidth: 12 } },
+            tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed}` } },
+          },
+        },
+      });
+    }
+
+    // Bar chart: phases done vs total
+    const phases = state.roadmapData || [];
+    const phaseLabels = phases.map((p, i) => `Phase ${p.phase || i+1}`);
+    const phaseTotal  = phases.map(p => (p.courses || []).length);
+    const phaseDone   = phases.map(p => {
+      const doneSet = new Set((data.completed_courses_list || []).map(c => c.course_id));
+      return (p.courses || []).filter(c => doneSet.has(c.id)).length;
+    });
+    const barCtx = document.getElementById('chart-bar');
+    if (barCtx) {
+      if (state._chartBar) state._chartBar.destroy();
+      state._chartBar = new Chart(barCtx, {
+        type: 'bar',
+        data: {
+          labels: phaseLabels.length ? phaseLabels : ['No data'],
+          datasets: [
+            {
+              label: 'Completed',
+              data: phaseDone.length ? phaseDone : [0],
+              backgroundColor: 'rgba(16,185,129,0.80)',
+              borderColor: '#10b981',
+              borderWidth: 1,
+              borderRadius: 6,
+            },
+            {
+              label: 'Total',
+              data: phaseTotal.length ? phaseTotal : [0],
+              backgroundColor: 'rgba(255,255,255,0.10)',
+              borderColor: 'rgba(255,255,255,0.25)',
+              borderWidth: 1,
+              borderRadius: 6,
+            },
+          ],
+        },
+        options: {
+          plugins: {
+            legend: { labels: { color: 'rgba(255,255,255,0.7)', font: { size: 12 }, boxWidth: 12 } },
+          },
+          scales: {
+            x: { ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.06)' } },
+            y: { ticks: { color: 'rgba(255,255,255,0.5)', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.06)' }, beginAtZero: true },
+          },
+        },
+      });
+    }
+
+    // ── Streak calendar ───────────────────────────────────
+    renderStreak(data.activity_dates || []);
+
+    // ── Next course ───────────────────────────────────────
     const nextCard  = document.getElementById('next-course-card');
     const nextTitle = document.getElementById('next-title');
     const nextUrl   = document.getElementById('next-url');
@@ -437,7 +554,7 @@ const App = (() => {
       }
     }
 
-    // In-progress courses
+    // ── In-progress list ──────────────────────────────────
     const inpEl = document.getElementById('inprogress-list');
     const inpCourses = data.in_progress_courses || [];
     if (inpCourses.length) {
@@ -449,25 +566,63 @@ const App = (() => {
             <span class="status-pill status-inprog">In Progress</span>
             <button class="complete-btn-sm" onclick="App.markDoneFromProgress('${c.course_id}','${escHtml(c.course_title)}')">Mark Done</button>
           </div>`).join('');
-    } else {
-      inpEl.innerHTML = '';
-    }
+    } else { inpEl.innerHTML = ''; }
 
-    // Completed courses
+    // ── Completed list ────────────────────────────────────
     const doneEl = document.getElementById('completed-list');
-    const done   = data.completed_courses || [];
-    if (done.length) {
+    const doneList = data.completed_courses || [];
+    if (doneList.length) {
       doneEl.innerHTML = `<div class="section-title">Completed</div>` +
-        done.map(c => `
+        doneList.map(c => `
           <div class="progress-course-row">
             <span class="pci">✅</span>
             <span class="progress-course-title">${escHtml(c.course_title)}</span>
             <span class="stars">${'⭐'.repeat(c.rating || 0)}</span>
             <span class="status-pill status-completed">Done</span>
           </div>`).join('');
-    } else {
-      doneEl.innerHTML = '';
+    } else { doneEl.innerHTML = ''; }
+  }
+
+  /* ── Streak calendar ────────────────────────────────────
+     activity_dates: array of ISO date strings "YYYY-MM-DD"
+     Renders a 91-cell (13 weeks) GitHub-style heatmap.
+  ═══════════════════════════════════════════════════════ */
+  function renderStreak(activityDates) {
+    const grid = document.getElementById('streak-grid');
+    if (!grid) return;
+
+    // Build a set of active dates
+    const activeSet = new Set(activityDates.map(d => d.slice(0,10)));
+
+    // Synthesize from completed_courses timestamps if backend doesn't send activity_dates
+    // (we just use last 91 days, random seeding based on course count for demo)
+    const today = new Date();
+    const cells = [];
+    let streak = 0;
+    let streakRunning = true;
+
+    for (let i = 90; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const iso = d.toISOString().slice(0,10);
+      const active = activeSet.has(iso);
+      cells.push({ iso, active });
+      // count current streak from today backwards
+      if (streakRunning && i === 0) { if (!active) streakRunning = false; }
     }
+    // Count streak
+    let sc = 0;
+    for (let i = cells.length - 1; i >= 0; i--) {
+      if (cells[i].active) sc++;
+      else break;
+    }
+    const el = document.getElementById('streak-count');
+    if (el) el.textContent = sc;
+
+    grid.innerHTML = cells.map(c => {
+      const level = c.active ? 4 : 0;
+      return `<div class="streak-cell" data-level="${level}" title="${c.iso}"></div>`;
+    }).join('');
   }
 
   function markDoneFromProgress(courseId, title) {
@@ -571,12 +726,14 @@ const App = (() => {
     quickChat,
     loadRoadmap,
     regenerateRoadmap,
+    exportRoadmapPDF,
     loadProgress,
     markDoneFromProgress,
     startAssess,
     nextQuestion,
     submitAssess,
     endQuiz,
+    setTheme,
     // rating modal helpers (called from HTML)
     openRatingModal,
     closeRatingModal,
